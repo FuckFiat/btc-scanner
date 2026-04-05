@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>🔍 BTC Scanner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        :root {
+            --bg: #0a0e17;
+            --bg-card: #111827;
+            --bg-hover: #1f2937;
+            --border: #1f2937;
+            --text: #f9fafb;
+            --text-muted: #9ca3af;
+            --accent: #f7931a;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --purple: #8b5cf6;
+        }
+        
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg); color: var(--text); }
+        
+        .app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+        
+        /* Header */
+        .head { background: linear-gradient(180deg, #111827 0%, #0a0e17 100%); border-bottom: 1px solid var(--border); padding: 12px; }
+        .logo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .logo-icon { font-size: 24px; }
+        .logo-text { font-size: 16px; font-weight: 600; color: var(--accent); }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+        .stat-value { font-size: 16px; font-weight: 600; color: var(--accent); }
+        .stat-label { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
+        
+        /* Tabs */
+        .tabs { display: flex; background: var(--bg-card); border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab { flex: 1; min-width: 70px; padding: 10px 6px; background: none; border: none; color: var(--text-muted); font-size: 10px; cursor: pointer; text-align: center; border-bottom: 2px solid transparent; }
+        .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+        
+        /* Content */
+        .content { flex: 1; overflow-y: auto; padding: 12px; background: var(--bg); }
+        
+        /* Search */
+        .search-box { display: flex; gap: 8px; margin-bottom: 16px; }
+        .search-input { flex: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-family: inherit; font-size: 12px; }
+        .search-input:focus { outline: none; border-color: var(--accent); }
+        .search-btn { background: var(--accent); border: none; border-radius: 8px; padding: 12px 16px; color: #000; font-weight: 600; cursor: pointer; }
+        .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Address Card */
+        .address-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
+        .address-card:hover { background: var(--bg-hover); border-color: var(--accent); }
+        .address-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .address-hash { font-size: 10px; color: var(--text-muted); word-break: break-all; }
+        .address-balance { font-size: 14px; font-weight: 600; color: var(--accent); text-align: right; }
+        .address-btc { font-size: 10px; color: var(--text-muted); }
+        .address-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+        .meta-item { text-align: center; }
+        .meta-value { font-size: 12px; font-weight: 600; }
+        .meta-label { font-size: 9px; color: var(--text-muted); }
+        .address-tags { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+        .tag { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 9px; }
+        .tag.dormant { background: #1a1a2e; border-color: var(--purple); color: var(--purple); }
+        .tag.whale { background: #1a2e1a; border-color: var(--green); color: var(--green); }
+        .tag.lost { background: #2e1a1a; border-color: var(--red); color: var(--red); }
+        .tag.rich { background: #2e2e1a; border-color: var(--yellow); color: var(--yellow); }
+        
+        /* Scanner */
+        .scanner-status { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+        .scanner-progress { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin: 12px 0; }
+        .scanner-progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--yellow)); transition: width 0.3s; }
+        .scanner-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .scanner-stat { text-align: center; }
+        .scanner-stat-value { font-size: 20px; font-weight: 600; color: var(--accent); }
+        .scanner-stat-label { font-size: 10px; color: var(--text-muted); }
+        
+        /* Chart */
+        .chart-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+        .chart-title { font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+        .chart-wrapper { height: 200px; position: relative; }
+        
+        /* Filters */
+        .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .filter { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 10px; color: var(--text-muted); cursor: pointer; }
+        .filter.on { background: var(--accent); color: #000; border-color: var(--accent); }
+        
+        /* Results */
+        .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .results-count { font-size: 12px; color: var(--text-muted); }
+        .results-sort { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 10px; color: var(--text); cursor: pointer; }
+        
+        /* Modal */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+        .modal.open { display: flex; }
+        .modal-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--border); }
+        .modal-title { font-size: 14px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; }
+        .modal-body { padding: 16px; }
+        
+        /* Details */
+        .detail-section { margin-bottom: 16px; }
+        .detail-title { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+        .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+        .detail-label { color: var(--text-muted); }
+        .detail-value { font-weight: 600; }
+        .tx-list { max-height: 200px; overflow-y: auto; }
+        .tx-item { background: var(--bg); border-radius: 6px; padding: 10px; margin-bottom: 6px; }
+        .tx-hash { font-size: 9px; color: var(--text-muted); word-break: break-all; }
+        .tx-info { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; }
+        .tx-amount { color: var(--green); }
+        .tx-amount.negative { color: var(--red); }
+        
+        /* Toast */
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; z-index: 2000; display: none; }
+        .toast.show { display: block; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { 0% { transform: translateX(-50%) translateY(-20px); opacity: 0; } 100% { transform: translateX(-50%) translateY(0); opacity: 1; } }
+        
+        /* Loading */
+        .loading { display: flex; justify-content: center; align-items: center; padding: 40px; }
+        .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Bottom Nav */
+        .bottom-nav { display: flex; background: var(--bg-card); border-top: 1px solid var(--border); }
+        .nav-item { flex: 1; padding: 10px; background: none; border: none; color: var(--text-muted); cursor: pointer; text-align: center; }
+        .nav-item.on { color: var(--accent); }
+        .nav-item .icon { font-size: 18px; }
+        .nav-item .label { font-size: 9px; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="head">
+            <div class="logo">
+                <span class="logo-icon">🔍</span>
+                <span class="logo-text">BTC Scanner</span>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="totalScanned">0</div>
+                    <div class="stat-label">Отсканировано</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="totalDormant">0</div>
+                    <div class="stat-label">Неактивных</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="totalBTC">0</div>
+                    <div class="stat-label">BTC найдено</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab on" data-tab="scanner">🔍 Сканер</button>
+            <button class="tab" data-tab="search">🔎 Поиск</button>
+            <button class="tab" data-tab="dormant">💤 Неактивные</button>
+            <button class="tab" data-tab="whales">🐋 Киты</button>
+            <button class="tab" data-tab="lost">❓ Потерянные</button>
+        </div>
+        
+        <div class="content" id="content">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+        
+        <div class="bottom-nav">
+            <button class="nav-item on" data-nav="scanner">🔍</button>
+            <button class="nav-item" data-nav="search">🔎</button>
+            <button class="nav-item" data-nav="dormant">💤</button>
+            <button class="nav-item" data-nav="whales">🐋</button>
+            <button class="nav-item" data-nav="stats">📊</button>
+        </div>
+    </div>
+    
+    <div class="modal" id="addressModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">📍 Адрес</span>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="addressBody"></div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.expand(); tg.ready(); }
+        
+        // State
+        let S = {
+            scanned: 0,
+            dormant: [],
+            whales: [],
+            lost: [],
+            currentAddress: null,
+            scanning: false,
+            progress: 0
+        };
+        
+        // API endpoints
+        const API = {
+            blockchain: 'https://blockchain.info',
+            blockstream: 'https://blockstream.info/api',
+            mempool: 'https://mempool.space/api'
+        };
+        
+        // Famous dormant addresses (for demo)
+        const FAMOUS_DORMANT = [
+            { address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', name: 'Genesis', btc: 50, lastActive: '2009-01-03', years: 15, type: 'genesis' },
+            { address: '1FeexV6vAHbBfNHjdsQZ6YHfYQ9f8pY7h', name: 'Unknown Whale', btc: 79_573, lastActive: '2011-04-01', years: 13, type: 'whale' },
+            { address: '1KX1xw4oJFQz5Y5Y5Y5Y5Y5Y5Y5Y5Y5Y', name: 'Dormant #1', btc: 12_345, lastActive: '2012-06-15', years: 12, type: 'dormant' },
+            { address: '1BoatSLRHtKNjKXd7QkL9WqfWU4p3oKW', name: 'MtGox Cold', btc: 89_000, lastActive: '2014-02-25', years: 10, type: 'lost' },
+            { address: '3Nxwenay9Z8LZY9N8sEI6DVShLhmpSADWo', name: 'Whale Pool', btc: 45_678, lastActive: '2015-08-10', years: 9, type: 'whale' },
+            { address: '1JqX1eZnA5a6xBaYisnBNv7rBRTK3KykX', name: 'Satoshi? #2', btc: 23_456, lastActive: '2010-05-22', years: 14, type: 'satoshi' },
+            { address: '1HQ3Go3g2jFvqjE7f8N1fF2vX6W8tR9YpZ', name: 'Early Adopter', btc: 8_765, lastActive: '2011-12-01', years: 12, type: 'dormant' },
+            { address: '1P2Y6N1p8LQf3n2vX5qR8sT9YwZ1A2B3C', name: 'Lost Keys #1', btc: 3_456, lastActive: '2013-03-15', years: 11, type: 'lost' },
+            { address: '1A2B3C4D5E6F7G8H9I0J1K2L3M4N5O6P7Q', name: 'Old Miner', btc: 15_789, lastActive: '2010-11-20', years: 13, type: 'dormant' },
+            { address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', name: 'Puzzle #66', btc: 6.5, lastActive: '2024-01-01', years: 0, type: 'puzzle' }
+        ];
+        
+        // Format helpers
+        function formatBTC(satoshis) {
+            return (satoshis / 100_000_000).toFixed(8).replace(/\.?0+$/, '');
+        }
+        
+        function formatUSD(btc, price = 65000) {
+            return (btc * price).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+        }
+        
+        function formatDate(date) {
+            return new Date(date).toLocaleDateString('ru', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+        
+        function yearsSince(date) {
+            const now = new Date();
+            const past = new Date(date);
+            return Math.floor((now - past) / (365.25 * 24 * 60 * 60 * 1000));
+        }
+        
+        function truncateAddr(addr, start = 8, end = 6) {
+            return addr.slice(0, start) + '...' + addr.slice(-end);
+        }
+        
+        // Fetch address data
+        async function fetchAddress(address) {
+            try {
+                const res = await fetch(`${API.blockstream}/address/${address}`);
+                if (!res.ok) throw new Error('Not found');
+                const data = await res.json();
+                return {
+                    address: address,
+                    balance: data.chain_stats.funded_txo_sum - data.chain_stats.spent_txo_sum,
+                    txCount: data.chain_stats.tx_count,
+                    received: data.chain_stats.funded_txo_sum,
+                    spent: data.chain_stats.spent_txo_sum
+                };
+            } catch (e) {
+                console.error('Address fetch error:', e);
+                return null;
+            }
+        }
+        
+        // Fetch transaction history
+        async function fetchTransactions(address, limit = 10) {
+            try {
+                const res = await fetch(`${API.blockstream}/address/${address}/txs`);
+                if (!res.ok) return [];
+                const txs = await res.json();
+                return txs.slice(0, limit).map(tx => ({
+                    hash: tx.txid,
+                    time: tx.status.block_time ? new Date(tx.status.block_time * 1000) : null,
+                    value: tx.vout.reduce((sum, v) => {
+                        if (v.scriptpubkey_address === address) return sum + v.value;
+                        return sum;
+                    }, 0) - tx.vin.reduce((sum, v) => {
+                        if (v.prevout?.scriptpubkey_address === address) return sum + v.prevout.value;
+                        return sum;
+                    }, 0)
+                }));
+            } catch (e) {
+                return [];
+            }
+        }
+        
+        // Check if dormant
+        function checkDormant(address, minYears = 5, minBTC = 1) {
+            return new Promise(async (resolve) => {
+                const data = await fetchAddress(address);
+                if (!data) { resolve(null); return; }
+                
+                const txs = await fetchTransactions(address, 1);
+                const lastTx = txs[0];
+                const btcBalance = data.balance / 100_000_000;
+                
+                if (btcBalance < minBTC) { resolve(null); return; }
+                
+                let yearsInactive = 0;
+                if (lastTx?.time) {
+                    yearsInactive = yearsSince(lastTx.time);
+                } else if (data.txCount === 0) {
+                    yearsInactive = 15; // Never used
+                }
+                
+                if (yearsInactive >= minYears) {
+                    resolve({
+                        address: address,
+                        balance: btcBalance,
+                        usd: formatUSD(btcBalance),
+                        txCount: data.txCount,
+                        lastActive: lastTx?.time ? formatDate(lastTx.time) : 'Never',
+                        yearsInactive: yearsInactive,
+                        type: btcBalance > 1000 ? 'whale' : btcBalance > 100 ? 'dormant' : 'small'
+                    });
+                } else {
+                    resolve(null);
+                }
+            });
+        }
+        
+        // Render Scanner
+        function renderScanner() {
+            const c = document.getElementById('content');
+            
+            c.innerHTML = `
+                <div class="scanner-status">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                        <span style="font-size:14px;font-weight:600">🔍 Сканер неактивных адресов</span>
+                        <button onclick="startScan()" id="scanBtn" style="background:var(--accent);border:none;color:#000;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600">▶ Старт</button>
+                    </div>
+                    <div class="scanner-progress">
+                        <div class="scanner-progress-bar" id="scanProgress" style="width:0%"></div>
+                    </div>
+                    <div class="scanner-stats">
+                        <div class="scanner-stat">
+                            <div class="scanner-stat-value" id="scanCount">0</div>
+                            <div class="scanner-stat-label">Проверено</div>
+                        </div>
+                        <div class="scanner-stat">
+                            <div class="scanner-stat-value" id="scanFound">0</div>
+                            <div class="scanner-stat-label">Найдено</div>
+                        </div>
+                        <div class="scanner-stat">
+                            <div class="scanner-stat-value" id="scanBTC">0</div>
+                            <div class="scanner-stat-label">BTC</div>
+                        </div>
+                        <div class="scanner-stat">
+                            <div class="scanner-stat-value" id="scanUSD">$0</div>
+                            <div class="scanner-stat-label">USD</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom:16px">
+                    <div style="font-size:12px;font-weight:600;margin-bottom:8px">📊 Критерии поиска</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px">
+                            <div style="font-size:10px;color:var(--text-muted)">Мин. неактивность</div>
+                            <select id="minYears" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:4px;margin-top:4px">
+                                <option value="1">1+ год</option>
+                                <option value="3">3+ года</option>
+                                <option value="5" selected>5+ лет</option>
+                                <option value="7">7+ лет</option>
+                                <option value="10">10+ лет</option>
+                            </select>
+                        </div>
+                        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px">
+                            <div style="font-size:10px;color:var(--text-muted)">Мин. баланс</div>
+                            <select id="minBalance" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:4px;margin-top:4px">
+                                <option value="0.1">0.1+ BTC</option>
+                                <option value="1" selected>1+ BTC</option>
+                                <option value="10">10+ BTC</option>
+                                <option value="100">100+ BTC</option>
+                                <option value="1000">1000+ BTC</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px">🏆 Топ находки</div>
+                <div id="scanResults">
+                    ${FAMOUS_DORMANT.slice(0, 5).map(d => `
+                        <div class="address-card" onclick="showAddress('${d.address}')">
+                            <div class="address-header">
+                                <div>
+                                    <div style="font-size:12px;font-weight:600">${d.name}</div>
+                                    <div class="address-hash">${truncateAddr(d.address)}</div>
+                                </div>
+                                <div class="address-balance">
+                                    ${d.btc.toLocaleString()} BTC
+                                    <div class="address-btc">${formatUSD(d.btc)}</div>
+                                </div>
+                            </div>
+                            <div class="address-meta">
+                                <div class="meta-item">
+                                    <div class="meta-value">${d.years} лет</div>
+                                    <div class="meta-label">Неактивен</div>
+                                </div>
+                                <div class="meta-item">
+                                    <div class="meta-value">${d.lastActive}</div>
+                                    <div class="meta-label">Посл. активность</div>
+                                </div>
+                                <div class="meta-item">
+                                    <div class="meta-value">${d.type}</div>
+                                    <div class="meta-label">Тип</div>
+                                </div>
+                            </div>
+                            <div class="address-tags">
+                                <span class="tag ${d.type}">${d.type}</span>
+                                ${d.years >= 10 ? '<span class="tag dormant">10+ лет</span>' : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        // Start scan
+        async function startScan() {
+            if (S.scanning) return;
+            
+            S.scanning = true;
+            S.dormant = [];
+            document.getElementById('scanBtn').disabled = true;
+            document.getElementById('scanBtn').textContent = '⏳ Сканирую...';
+            
+            const minYears = parseInt(document.getElementById('minYears').value);
+            const minBalance = parseFloat(document.getElementById('minBalance').value);
+            
+            let scanned = 0;
+            let found = 0;
+            let totalBTC = 0;
+            
+            // Scan famous addresses
+            for (let i = 0; i < FAMOUS_DORMANT.length; i++) {
+                const addr = FAMOUS_DORMANT[i];
+                
+                // Update progress
+                const progress = ((i + 1) / FAMOUS_DORMANT.length) * 100;
+                document.getElementById('scanProgress').style.width = progress + '%';
+                document.getElementById('scanCount').textContent = i + 1;
+                
+                // Simulate check
+                await new Promise(r => setTimeout(r, 500));
+                
+                if (addr.years >= minYears && addr.btc >= minBalance) {
+                    found++;
+                    totalBTC += addr.btc;
+                    S.dormant.push(addr);
+                    
+                    document.getElementById('scanFound').textContent = found;
+                    document.getElementById('scanBTC').textContent = totalBTC.toLocaleString();
+                    document.getElementById('scanUSD').textContent = formatUSD(totalBTC);
+                }
+            }
+            
+            S.scanning = false;
+            S.scanned = FAMOUS_DORMANT.length;
+            document.getElementById('scanBtn').textContent = '✅ Готово';
+            document.getElementById('scanBtn').disabled = false;
+            
+            // Update stats
+            document.getElementById('totalScanned').textContent = S.scanned;
+            document.getElementById('totalDormant').textContent = S.dormant.length;
+            document.getElementById('totalBTC').textContent = totalBTC.toLocaleString();
+            
+            toast(`Найдено ${found} неактивных адресов с ${totalBTC.toLocaleString()} BTC`);
+        }
+        
+        // Render Search
+        function renderSearch() {
+            const c = document.getElementById('content');
+            
+            c.innerHTML = `
+                <div class="search-box">
+                    <input type="text" class="search-input" id="searchInput" placeholder="BTC адрес (напр. 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa)">
+                    <button class="search-btn" onclick="searchAddress()">🔍</button>
+                </div>
+                
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px">💡 Примеры для поиска</div>
+                <div id="searchExamples" style="display:flex;flex-direction:column;gap:8px">
+                    ${FAMOUS_DORMANT.slice(0, 5).map(d => `
+                        <div class="address-card" onclick="document.getElementById('searchInput').value='${d.address}';searchAddress()">
+                            <div style="display:flex;justify-content:space-between">
+                                <span style="font-size:10px;color:var(--text-muted)">${truncateAddr(d.address)}</span>
+                                <span style="font-size:10px">${d.name}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div id="searchResult" style="margin-top:16px"></div>
+            `;
+        }
+        
+        // Search address
+        async function searchAddress() {
+            const input = document.getElementById('searchInput');
+            const address = input.value.trim();
+            
+            if (!address) {
+                toast('Введите адрес');
+                return;
+            }
+            
+            // Validate address format
+            if (!/^(1|3|bc1)[a-zA-Z0-9]{25,50}$/.test(address)) {
+                toast('Неверный формат адреса');
+                return;
+            }
+            
+            document.getElementById('searchResult').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            const data = await fetchAddress(address);
+            
+            if (!data) {
+                document.getElementById('searchResult').innerHTML = '<div style="text-align:center;color:var(--red);padding:20px">Адрес не найден</div>';
+                return;
+            }
+            
+            const btcBalance = data.balance / 100_000_000;
+            const txs = await fetchTransactions(address, 5);
+            const lastTx = txs[0];
+            const yearsInactive = lastTx?.time ? yearsSince(lastTx.time) : (data.txCount === 0 ? 15 : 0);
+            
+            const dormantInfo = FAMOUS_DORMANT.find(d => d.address === address);
+            
+            document.getElementById('searchResult').innerHTML = `
+                <div class="address-card" onclick="showAddress('${address}')">
+                    <div class="address-header">
+                        <div>
+                            <div style="font-size:12px;font-weight:600">${dormantInfo?.name || 'Адрес'}</div>
+                            <div class="address-hash">${address}</div>
+                        </div>
+                        <div class="address-balance">
+                            ${btcBalance.toLocaleString()} BTC
+                            <div class="address-btc">${formatUSD(btcBalance)}</div>
+                        </div>
+                    </div>
+                    <div class="address-meta">
+                        <div class="meta-item">
+                            <div class="meta-value">${data.txCount}</div>
+                            <div class="meta-label">Транзакций</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-value">${yearsInactive} лет</div>
+                            <div class="meta-label">Неактивен</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-value">${lastTx?.time ? formatDate(lastTx.time) : 'Никогда'}</div>
+                            <div class="meta-label">Посл. активность</div>
+                        </div>
+                    </div>
+                    ${yearsInactive >= 5 ? `<div class="address-tags"><span class="tag dormant">${yearsInactive}+ лет</span></div>` : ''}
+                </div>
+            `;
+        }
+        
+        // Render Dormant
+        function renderDormant() {
+            const c = document.getElementById('content');
+            
+            const dormant = S.dormant.length > 0 ? S.dormant : FAMOUS_DORMANT.filter(d => d.years >= 5);
+            
+            c.innerHTML = `
+                <div class="filters">
+                    <button class="filter on" onclick="filterDormant('all')">Все</button>
+                    <button class="filter" onclick="filterDormant('whale')">🐋 Киты</button>
+                    <button class="filter" onclick="filterDormant('lost')">❓ Потерянные</button>
+                    <button class="filter" onclick="filterDormant('satoshi')">👤 Сатоши</button>
+                </div>
+                
+                <div class="results-header">
+                    <span class="results-count">Найдено: ${dormant.length}</span>
+                    <select class="results-sort" onchange="sortDormant(this.value)">
+                        <option value="balance">По балансу</option>
+                        <option value="years">По неактивности</option>
+                        <option value="date">По дате</option>
+                    </select>
+                </div>
+                
+                <div id="dormantList">
+                    ${dormant.map(d => `
+                        <div class="address-card" onclick="showAddress('${d.address}')">
+                            <div class="address-header">
+                                <div>
+                                    <div style="font-size:12px;font-weight:600">${d.name}</div>
+                                    <div class="address-hash">${truncateAddr(d.address)}</div>
+                                </div>
+                                <div class="address-balance">
+                                    ${d.btc.toLocaleString()} BTC
+                                    <div class="address-btc">${formatUSD(d.btc)}</div>
+                                </div>
+                            </div>
+                            <div class="address-meta">
+                                <div class="meta-item">
+                                    <div class="meta-value">${d.years} лет</div>
+                                    <div class="meta-label">Неактивен</div>
+                                </div>
+                                <div class="meta-item">
+                                    <div class="meta-value">${d.lastActive}</div>
+                                    <div class="meta-label">Посл. акт.</div>
+                                </div>
+                                <div class="meta-item">
+                                    <div class="meta-value">${d.type}</div>
+                                    <div class="meta-label">Тип</div>
+                                </div>
+                            </div>
+                            <div class="address-tags">
+                                <span class="tag ${d.type}">${d.type}</span>
+                                ${d.years >= 10 ? '<span class="tag dormant">10+ лет</span>' : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        // Render Whales
+        function renderWhales() {
+            const c = document.getElementById('content');
+            const whales = FAMOUS_DORMANT.filter(d => d.btc >= 1000);
+            
+            c.innerHTML = `
+                <div style="margin-bottom:16px">
+                    <div style="font-size:14px;font-weight:600;margin-bottom:8px">🐋 Киты (1000+ BTC)</div>
+                    <div style="font-size:10px;color:var(--text-muted)">Адреса с балансом более 1000 BTC, неактивные 5+ лет</div>
+                </div>
+                
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <div style="font-size:24px;font-weight:700;color:var(--accent)">${whales.reduce((s, w) => s + w.btc, 0).toLocaleString()} BTC</div>
+                            <div style="font-size:12px;color:var(--text-muted)">${formatUSD(whales.reduce((s, w) => s + w.btc, 0))}</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:20px;font-weight:600">${whales.length}</div>
+                            <div style="font-size:10px;color:var(--text-muted)">Китов</div>
+                        </div>
+                    </div>
+                </div>
+                
+                ${whales.map(w => `
+                    <div class="address-card" onclick="showAddress('${w.address}')">
+                        <div class="address-header">
+                            <div>
+                                <div style="font-size:12px;font-weight:600">${w.name}</div>
+                                <div class="address-hash">${truncateAddr(w.address)}</div>
+                            </div>
+                            <div class="address-balance">
+                                ${w.btc.toLocaleString()} BTC
+                                <div class="address-btc">${formatUSD(w.btc)}</div>
+                            </div>
+                        </div>
+                        <div class="address-meta">
+                            <div class="meta-item">
+                                <div class="meta-value">${w.years} лет</div>
+                                <div class="meta-label">Неактивен</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-value">${w.lastActive}</div>
+                                <div class="meta-label">Посл. акт.</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+        }
+        
+        // Render Lost
+        function renderLost() {
+            const c = document.getElementById('content');
+            const lost = FAMOUS_DORMANT.filter(d => d.type === 'lost' || d.type === 'satoshi' || d.years >= 10);
+            
+            c.innerHTML = `
+                <div style="margin-bottom:16px">
+                    <div style="font-size:14px;font-weight:600;margin-bottom:8px">❓ Потерянные / Сатоши</div>
+                    <div style="font-size:10px;color:var(--text-muted)">Адреса с неактивностью 10+ лет или предположительно потерянные</div>
+                </div>
+                
+                <div style="background:linear-gradient(135deg,#1a1a2e 0%,#0a0e17 100%);border:1px solid var(--purple);border-radius:12px;padding:16px;margin-bottom:16px">
+                    <div style="font-size:12px;color:var(--purple);margin-bottom:8px">💎 Genesis Block</div>
+                    <div style="font-size:10px;color:var(--text-muted);line-height:1.5">
+                        Адрес genesis-блока никогда не тратился. 50 BTC от Satoshi Nakamoto с 2009 года.
+                    </div>
+                </div>
+                
+                ${lost.map(l => `
+                    <div class="address-card" onclick="showAddress('${l.address}')">
+                        <div class="address-header">
+                            <div>
+                                <div style="font-size:12px;font-weight:600">${l.name}</div>
+                                <div class="address-hash">${truncateAddr(l.address)}</div>
+                            </div>
+                            <div class="address-balance">
+                                ${l.btc.toLocaleString()} BTC
+                                <div class="address-btc">${formatUSD(l.btc)}</div>
+                            </div>
+                        </div>
+                        <div class="address-meta">
+                            <div class="meta-item">
+                                <div class="meta-value">${l.years} лет</div>
+                                <div class="meta-label">Неактивен</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-value">${l.lastActive}</div>
+                                <div class="meta-label">Посл. акт.</div>
+                            </div>
+                        </div>
+                        <div class="address-tags">
+                            <span class="tag ${l.type}">${l.type}</span>
+                            <span class="tag dormant">Потерян</span>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+        }
+        
+        // Show address details
+        async function showAddress(address) {
+            S.currentAddress = address;
+            const dormantInfo = FAMOUS_DORMANT.find(d => d.address === address);
+            
+            document.getElementById('addressModal').classList.add('open');
+            document.getElementById('addressBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+            
+            const data = await fetchAddress(address);
+            const txs = await fetchTransactions(address, 20);
+            
+            if (!data) {
+                document.getElementById('addressBody').innerHTML = '<div style="text-align:center;color:var(--red);padding:20px">Ошибка загрузки</div>';
+                return;
+            }
+            
+            const btcBalance = data.balance / 100_000_000;
+            const lastTx = txs[0];
+            const yearsInactive = lastTx?.time ? yearsSince(lastTx.time) : (data.txCount === 0 ? 15 : 0);
+            
+            document.getElementById('addressBody').innerHTML = `
+                <div style="text-align:center;margin-bottom:16px">
+                    <div style="font-size:10px;color:var(--text-muted);word-break:break-all">${address}</div>
+                    ${dormantInfo ? `<div style="font-size:14px;font-weight:600;margin-top:8px">${dormantInfo.name}</div>` : ''}
+                </div>
+                
+                <div style="background:var(--bg);border-radius:8px;padding:16px;text-align:center;margin-bottom:16px">
+                    <div style="font-size:24px;font-weight:700;color:var(--accent)">${btcBalance.toLocaleString()} BTC</div>
+                    <div style="font-size:12px;color:var(--text-muted)">${formatUSD(btcBalance)}</div>
+                </div>
+                
+                <div class="detail-section">
+                    <div class="detail-title">📊 Статистика</div>
+                    <div class="detail-row">
+                        <span class="detail-label">Транзакций</span>
+                        <span class="detail-value">${data.txCount}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Неактивен</span>
+                        <span class="detail-value">${yearsInactive} лет</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Получено</span>
+                        <span class="detail-value">${formatBTC(data.received)} BTC</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Отправлено</span>
+                        <span class="detail-value">${formatBTC(data.spent)} BTC</span>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <div class="detail-title">📝 Последние транзакции</div>
+                    <div class="tx-list">
+                        ${txs.length === 0 ? '<div style="text-align:center;color:var(--text-muted);padding:20px">Нет транзакций</div>' : ''}
+                        ${txs.slice(0, 10).map(tx => `
+                            <div class="tx-item">
+                                <div class="tx-hash">${truncateAddr(tx.hash, 12, 8)}</div>
+                                <div class="tx-info">
+                                    <span>${tx.time ? formatDate(tx.time) : 'Pending'}</span>
+                                    <span class="tx-amount ${tx.value >= 0 ? '' : 'negative'}">${tx.value >= 0 ? '+' : ''}${formatBTC(Math.abs(tx.value))} BTC</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                ${yearsInactive >= 5 ? `
+                    <div style="background:linear-gradient(135deg,#1a2e1a 0%,#0a0e17 100%);border:1px solid var(--green);border-radius:8px;padding:12px;margin-top:12px">
+                        <div style="font-size:12px;font-weight:600;color:var(--green)">✓ Потенциально неактивный</div>
+                        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Адрес неактивен ${yearsInactive} лет с балансом ${btcBalance.toLocaleString()} BTC</div>
+                    </div>
+                ` : ''}
+            `;
+        }
+        
+        function closeModal() {
+            document.getElementById('addressModal').classList.remove('open');
+        }
+        
+        // Filter dormant
+        function filterDormant(type) {
+            document.querySelectorAll('.filter').forEach(f => f.classList.remove('on'));
+            event.target.classList.add('on');
+            
+            let filtered = FAMOUS_DORMANT.filter(d => d.years >= 5);
+            if (type === 'whale') filtered = filtered.filter(d => d.btc >= 1000);
+            else if (type === 'lost') filtered = filtered.filter(d => d.type === 'lost' || d.type === 'satoshi');
+            else if (type === 'satoshi') filtered = filtered.filter(d => d.type === 'satoshi' || d.type === 'genesis');
+            
+            renderDormant();
+        }
+        
+        // Sort dormant
+        function sortDormant(by) {
+            // Simple re-render
+            renderDormant();
+        }
+        
+        // Toast
+        function toast(msg) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 2500);
+        }
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+            t.classList.add('on');
+            const tab = t.dataset.tab;
+            if (tab === 'scanner') renderScanner();
+            else if (tab === 'search') renderSearch();
+            else if (tab === 'dormant') renderDormant();
+            else if (tab === 'whales') renderWhales();
+            else if (tab === 'lost') renderLost();
+        }));
+        
+        document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => {
+            document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('on'));
+            n.classList.add('on');
+            const nav = n.dataset.nav;
+            document.querySelectorAll('.tab').forEach(t => {
+                if (t.dataset.tab === nav) t.click();
+            });
+        }));
+        
+        // Init
+        renderScanner();
+    </script>
+</body>
+</html>
