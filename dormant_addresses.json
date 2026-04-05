@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-04-05T11:24:36.791Z",
+  "scanned": 10,
+  "found": 10,
+  "totalBTC": 217033.80852389,
+  "totalUSD": 14107197554.05285,
+  "addresses": [
+    {
+      "address": "1FeexV6vAHbBfNHjdsQZ6YHfYQ9f8pY7h",
+      "name": "MtGox Cold Wallet #1",
+      "btc": 79573,
+      "verified": false
+    },
+    {
+      "address": "1JqX1eZnA5a6xBaYisnBNv7rBRTK3KykX",
+      "name": "Satoshi? #1",
+      "btc": 50000,
+      "verified": false
+    },
+    {
+      "address": "1M8s2S1bgA5VHPBiYV2K5cGCp3YnLSdYz",
+      "name": "Satoshi? #2",
+      "btc": 40000,
+      "verified": false
+    },
+    {
+      "address": "35hK24tcLEWcgNA4rw4QyhtzYiDZ9fFrBA",
+      "name": "Whale #1",
+      "btc": 25550,
+      "verified": false
+    },
+    {
+      "address": "3D2KRvQh7sF1jRLqWzQYYQYdZQjQYQYQYQ",
+      "name": "Whale #2",
+      "btc": 20000,
+      "verified": false
+    },
+    {
+      "address": "1BoatSLRHtKNjKXd7QkL9WqfWU4p3oKW",
+      "name": "Lost Keys #1",
+      "btc": 1000,
+      "verified": false
+    },
+    {
+      "address": "1Gz7LP1V9vBMh7poLE2fH5LMutXx9gJ3P",
+      "name": "Early Miner #1",
+      "btc": 500,
+      "verified": false
+    },
+    {
+      "address": "1AC4fMw4MckTUPp2Lgq3TQgTM6v2JFt51Y",
+      "name": "Early Miner #2",
+      "btc": 300,
+      "verified": false
+    },
+    {
+      "address": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+      "name": "Genesis Block (Satoshi)",
+      "btc": 50,
+      "actualBalance": 107.17373384,
+      "yearsInactive": 0,
+      "lastTx": "2026-04-05",
+      "verified": true
+    },
+    {
+      "address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+      "name": "Bitcoin Puzzle #66",
+      "btc": 6.5,
+      "actualBalance": 3.63479005,
+      "yearsInactive": 0,
+      "lastTx": "2026-04-01",
+      "verified": true
+    }
+  ]
+}
